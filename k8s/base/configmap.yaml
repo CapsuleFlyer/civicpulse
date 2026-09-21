@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  # Non-secret configuration only. Anything here is readable by anyone with
+  # get on configmaps in this namespace, which is a much larger set of people
+  # than those who should see a database password.
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  REDIS_URL: "redis://redis:6379/0"
+  TRIAGE_PROVIDER: "llm"
+  LLM_BASE_URL: "https://api.groq.com/openai/v1"
+  LLM_MODEL: "llama-3.1-8b-instant"
+  LLM_PROVIDER_LABEL: "llm:groq"
+  TRIAGE_TIMEOUT_SECONDS: "10"
+  TRIAGE_CACHE_TTL_SECONDS: "86400"
+  STATS_CACHE_TTL_SECONDS: "30"
+  RATE_LIMIT_REQUESTS: "30"
+  RATE_LIMIT_WINDOW_SECONDS: "60"
+  RUN_MIGRATIONS: "0"

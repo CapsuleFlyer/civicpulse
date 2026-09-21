@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: civicpulse
+
+resources:
+  - ../../base
+
+# Locally built images loaded straight into the k3d/kind node, so there is no
+# registry in the loop while you are iterating.
+images:
+  - name: ghcr.io/your-org/civicpulse-backend
+    newName: civicpulse/backend
+    newTag: dev
+  - name: ghcr.io/your-org/civicpulse-frontend
+    newName: civicpulse/frontend
+    newTag: dev
+
+configMapGenerator:
+  - name: backend-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      # No key on a laptop: the rules engine is a first-class provider, not a
+      # degraded mode, so development needs no quota at all.
+      - TRIAGE_PROVIDER=rules
+      - RATE_LIMIT_REQUESTS=100
+
+patches:
+  - path: replicas.yaml
+  - path: hpa.yaml
+  - path: ingress.yaml

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: civicpulse
+  labels:
+    app.kubernetes.io/part-of: civicpulse
+    pod-security.kubernetes.io/enforce: baseline

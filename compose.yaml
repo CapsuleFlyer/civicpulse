@@ -1,0 +1,161 @@
+# Development stack. One command, five containers, seeded data.
+#
+# The two networks are the point of this file: `edge` is where anything
+# internet-facing lives, `internal` is marked internal: true so it has no route
+# out and no route in. The backend is the only service on both, which is what
+# makes `docker compose exec frontend ping database` fail — see §2 of the README.
+
+name: civicpulse
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: civicpulse/frontend:dev
+    environment:
+      BACKEND_ORIGIN: http://backend:8000
+      API_BASE_URL: /api
+      APP_ENVIRONMENT: development
+      APP_VERSION: ${IMAGE_TAG:-dev}
+    ports:
+      - "8080:8080"
+    networks:
+      - edge
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 128M }
+        reservations: { cpus: "0.05", memory: 32M }
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: civicpulse/backend:dev
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+      REDIS_URL: redis://cache:6379/0
+      TRIAGE_PROVIDER: ${TRIAGE_PROVIDER:-rules}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.1-8b-instant}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-10}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: development
+      RUN_MIGRATIONS: "1"
+      RUN_SEED: "1"
+    # Published in dev only, so you can curl the API and read /api/docs.
+    # compose.prod.yaml does not publish it.
+    ports:
+      - "8000:8000"
+    volumes:
+      # Development only: source is mounted for hot reload, so an edit is
+      # visible without a rebuild. Wrong in production, where the image must be
+      # the single immutable artefact that was tested — see compose.prod.yaml.
+      - ./backend/app:/srv/app/app:ro
+    networks:
+      # The only service on both networks. It bridges the citizen-facing edge
+      # and the data plane, and nothing else is allowed to.
+      - edge
+      - internal
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "1.00", memory: 512M }
+        reservations: { cpus: "0.10", memory: 128M }
+
+  database:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      # pg_isready, not a TCP check: the port is open well before the server
+      # will accept a query, and depends_on would let the backend start early.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "1.00", memory: 512M }
+
+  cache:
+    image: redis:7.4-alpine
+    # AOF on: see docs/ENGINEERING-NOTES.md for why a cache gets a volume.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redisdata:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+
+  ollama:
+    image: ollama/ollama:0.5.4
+    profiles: ["offline"]
+    # On `edge` rather than `internal` only because the first run pulls a model;
+    # once ollama_models is populated it needs no network at all.
+    networks:
+      - edge
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "2.00", memory: 4G }
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true   # no route to or from the outside world
+
+volumes:
+  pgdata:       # the durable one: every complaint ever filed
+  redisdata:    # AOF; justified in docs/ENGINEERING-NOTES.md
+  ollama_models: # model weights, so `up` does not re-pull 800 MB

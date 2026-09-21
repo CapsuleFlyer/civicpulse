@@ -1,0 +1,141 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels: { app.kubernetes.io/name: backend }
+spec:
+  type: ClusterIP
+  selector: { app.kubernetes.io/name: backend }
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels: { app.kubernetes.io/name: backend }
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      # Zero, so capacity never dips below `replicas` during a rollout. With
+      # maxUnavailable: 1 and two replicas, half the fleet can be gone while
+      # the new pod is still warming up.
+      maxUnavailable: 0
+  selector:
+    matchLabels: { app.kubernetes.io/name: backend }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: backend }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # 35s: preStop sleep (10s) + in-flight drain + pool close, with headroom.
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: backend
+          image: ghcr.io/your-org/civicpulse-backend:dev  # overlays pin this to a SHA
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef: { name: backend-config }
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: POSTGRES_DB } }
+            - name: LLM_API_KEY
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: LLM_API_KEY } }
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+          lifecycle:
+            preStop:
+              # Endpoint removal and pod termination are concurrent, not ordered.
+              # This sleep lets the Service stop routing to this pod before the
+              # server starts refusing connections, which is the difference
+              # between a clean rollout and a handful of 502s.
+              exec: { command: ["sh", "-c", "sleep 10"] }
+          startupProbe:
+            # Up to 60s to boot without being killed. A slow start is not a
+            # failure, and without this a cold cluster restart-loops forever.
+            httpGet: { path: /health, port: http }
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            # /health touches nothing. If this depended on Postgres, a slow
+            # database would restart every backend pod simultaneously.
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            # /ready does depend on Postgres and Redis: a pod that cannot reach
+            # them should leave the Service, not be restarted.
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            # requests are not optional decoration: the HPA computes utilisation
+            # as usage ÷ request, so without cpu here the denominator is missing
+            # and the HPA reports <unknown>/60% forever.
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { cpu: 500m, memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-migrate
+  annotations:
+    # Runs before the Deployment rolls. Migrations belong in one ordered place,
+    # not in every replica's start-up racing every other replica.
+    argocd.argoproj.io/hook: PreSync
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/your-org/civicpulse-backend:dev
+          command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+          envFrom:
+            - configMapRef: { name: backend-config }
+          env:
+            - name: RUN_MIGRATIONS
+              value: "0"
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: backend-secrets, key: POSTGRES_DB } }
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }

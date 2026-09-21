@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: civicpulse
+
+resources:
+  - ../../base
+
+# Deploy by immutable reference. CI rewrites these tags with the commit SHA:
+#
+#   kustomize edit set image ghcr.io/your-org/civicpulse-backend=ghcr.io/your-org/civicpulse-backend:$GITHUB_SHA
+#
+# `latest` may be pushed; it is never deployed, because "what is production
+# running?" has to have an answer you can paste into `git show`.
+images:
+  - name: ghcr.io/your-org/civicpulse-backend
+    newTag: REPLACED_BY_CI
+  - name: ghcr.io/your-org/civicpulse-frontend
+    newTag: REPLACED_BY_CI
+
+configMapGenerator:
+  - name: backend-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - TRIAGE_PROVIDER=llm
+      - RATE_LIMIT_REQUESTS=30
+
+patches:
+  - path: resources.yaml

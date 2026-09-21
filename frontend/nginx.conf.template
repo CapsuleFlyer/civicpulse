@@ -1,0 +1,55 @@
+# Templated at container start by docker-entrypoint.sh (envsubst), so one image
+# serves dev, CI and the cluster with a different BACKEND_ORIGIN each time.
+server {
+    listen       8080;
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # Nothing here knows an absolute backend URL: the browser only ever calls
+    # same-origin /api, which removes CORS from the production path entirely.
+    location /api/ {
+        proxy_pass         ${BACKEND_ORIGIN};
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        # The backend rate-limits per client IP; without this every citizen
+        # would share one bucket keyed on the nginx container's address.
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Request-ID      $request_id;
+        proxy_read_timeout 30s;
+    }
+
+    # Runtime configuration, regenerated on every container start. Never cached:
+    # a stale config.js would pin a redeployed frontend to yesterday's settings.
+    location = /config.js {
+        add_header Cache-Control "no-store, must-revalidate";
+        try_files /config.js =404;
+    }
+
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # Hashed assets are immutable; index.html must not be, or a deploy would
+    # keep serving the old bundle from the browser cache.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip              on;
+    gzip_types        text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length   1024;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+}

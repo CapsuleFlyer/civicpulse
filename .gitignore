@@ -1,0 +1,48 @@
+# --- secrets --------------------------------------------------------------
+# The single most expensive line in this file.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+kubeconfig
+*.kubeconfig
+
+# --- python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- node -----------------------------------------------------------------
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# --- tooling --------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- build / test output --------------------------------------------------
+sbom*.json
+trivy-results*.sarif
+load/results/
+k6-summary.json
+
+# Evidence screenshots ARE committed — docs/evidence/ is deliberately absent
+# from this file.

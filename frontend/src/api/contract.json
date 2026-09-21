@@ -1,0 +1,16 @@
+{
+  "description": "Operations this frontend depends on. Checked against the backend's live OpenAPI schema by scripts/check_api_contract.py in CI.",
+  "operations": [
+    { "method": "post", "path": "/api/complaints", "success": 201, "errors": [400, 429] },
+    { "method": "get", "path": "/api/complaints", "success": 200 },
+    { "method": "get", "path": "/api/complaints/{complaint_id}", "success": 200, "errors": [404] },
+    { "method": "patch", "path": "/api/complaints/{complaint_id}/status", "success": 200, "errors": [409] },
+    { "method": "get", "path": "/api/stats", "success": 200 },
+    { "method": "get", "path": "/api/meta/providers", "success": 200 }
+  ],
+  "enums": {
+    "Category": ["water", "electricity", "sanitation", "roads", "streetlights", "other"],
+    "Priority": ["high", "normal", "low"],
+    "Status": ["open", "in_progress", "resolved", "rejected"]
+  }
+}

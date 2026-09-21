@@ -1,0 +1,24 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: backend-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  updatePolicy:
+    # Recommend only; never evict.
+    #
+    # In "Auto" alongside a CPU-based HPA the two controllers fight over one
+    # signal: VPA raises the CPU request, which lowers utilisation (usage ÷
+    # request), which makes the HPA scale in, which raises load per pod, which
+    # makes VPA raise the request again. Recommender mode plus a human applying
+    # the number is current industrial practice for precisely this reason.
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: backend
+        minAllowed: { cpu: 50m, memory: 128Mi }
+        maxAllowed: { cpu: "1", memory: 1Gi }
+        controlledResources: ["cpu", "memory"]

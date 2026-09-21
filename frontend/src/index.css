@@ -1,0 +1,261 @@
+/* ---------------------------------------------------------------------------
+   CivicPulse — visual language
+
+   The subject is a municipal works department, so the surfaces borrow from
+   public-works paperwork rather than from consumer SaaS: a cool paper ground,
+   a deep petrol ink, hairline rules that separate rows the way a register does,
+   and exactly one loud colour — the brick red used on hazard signage — spent
+   only on things that are actually urgent.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --paper: #eef1ec;
+  --card: #ffffff;
+  --ink: #16241f;
+  --ink-soft: #4f635c;
+  --rule: #ccd5cd;
+  --signal: #a9301b;   /* high priority, destructive actions, hazard */
+  --civic: #1d5a76;    /* interactive: links, focus, primary action */
+  --amber: #a97613;    /* in-progress, warnings that are not hazards */
+  --moss: #3f6b45;     /* resolved, healthy */
+
+  --shadow-raise: 0 1px 0 var(--rule);
+  --radius: 3px;
+  --sans: ui-sans-serif, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  font-feature-settings: "tnum" 1;
+}
+
+h1, h2, h3 { line-height: 1.15; margin: 0; font-weight: 600; letter-spacing: -0.012em; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1rem; }
+p { margin: 0 0 0.75rem; max-width: 68ch; }
+a { color: var(--civic); }
+
+:focus-visible {
+  outline: 2px solid var(--civic);
+  outline-offset: 2px;
+}
+
+/* --- shell ---------------------------------------------------------------- */
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  background: var(--card);
+}
+
+.masthead__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: baseline;
+}
+
+.masthead__mark {
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin-right: auto;
+}
+
+.masthead__mark span { color: var(--ink-soft); font-weight: 400; }
+
+.nav { display: flex; gap: 1.25rem; }
+
+.nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.nav a:hover { color: var(--ink); }
+.nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--signal); }
+
+.page { max-width: 1120px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+.page__lede { color: var(--ink-soft); max-width: 60ch; margin-top: 0.4rem; }
+
+.stack > * + * { margin-top: 1.5rem; }
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.panel--quiet { background: transparent; border-style: dashed; }
+
+/* --- forms ---------------------------------------------------------------- */
+
+.field { display: block; margin-bottom: 1.1rem; max-width: 62ch; }
+.field__label { display: block; font-weight: 600; margin-bottom: 0.3rem; }
+.field__hint { display: block; color: var(--ink-soft); font-size: 0.875rem; margin-bottom: 0.4rem; }
+
+.field input,
+.field textarea,
+.filters select {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  padding: 0.55rem 0.7rem;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.field textarea { min-height: 7.5rem; resize: vertical; }
+.field[data-invalid="true"] input,
+.field[data-invalid="true"] textarea { border-color: var(--signal); }
+
+.field__error { display: block; color: var(--signal); font-size: 0.875rem; margin-top: 0.3rem; }
+
+.button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--civic);
+  background: var(--civic);
+  color: #fff;
+  cursor: pointer;
+}
+
+.button:hover { background: #17495f; }
+.button:disabled { opacity: 0.55; cursor: progress; }
+
+.button--ghost {
+  background: transparent;
+  color: var(--civic);
+}
+
+.button--ghost:hover { background: #e6edf1; }
+
+.button--small { padding: 0.25rem 0.6rem; font-size: 0.85rem; font-weight: 500; }
+
+/* --- data ----------------------------------------------------------------- */
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--card); }
+
+table { border-collapse: collapse; width: 100%; min-width: 60rem; }
+
+th, td { text-align: left; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+
+th { font-size: 0.82rem; font-weight: 600; color: var(--ink-soft); background: #f6f8f5; position: sticky; top: 0; }
+
+tbody tr:last-child td { border-bottom: none; }
+
+td.text { min-width: 22rem; }
+td .meta { color: var(--ink-soft); font-size: 0.82rem; }
+
+.mono { font-family: var(--mono); font-size: 0.82rem; color: var(--ink-soft); }
+
+.tag {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tag--high { color: var(--signal); }
+.tag--normal { color: var(--ink-soft); }
+.tag--low { color: var(--ink-soft); font-weight: 500; }
+.tag--open { color: var(--civic); }
+.tag--in_progress { color: var(--amber); }
+.tag--resolved { color: var(--moss); }
+.tag--rejected { color: var(--ink-soft); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: flex-end; }
+.filters label { font-size: 0.85rem; color: var(--ink-soft); display: block; }
+.filters select { width: auto; min-width: 9rem; }
+
+.pager { display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem; }
+.pager__position { color: var(--ink-soft); font-size: 0.9rem; }
+
+.notice {
+  border-left: 3px solid var(--signal);
+  background: #fbeeeb;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.notice--info { border-left-color: var(--civic); background: #eaf1f5; }
+
+/* --- triage receipt ------------------------------------------------------- */
+
+.receipt { border-top: 3px solid var(--ink); }
+.receipt__grid { display: grid; gap: 1rem 2rem; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); margin: 1rem 0; }
+.receipt__label { color: var(--ink-soft); font-size: 0.85rem; }
+.receipt__value { font-size: 1.05rem; font-weight: 600; }
+.receipt__summary { border-left: 3px solid var(--rule); padding-left: 0.9rem; font-style: italic; }
+
+/* --- stats ---------------------------------------------------------------- */
+
+.bars { display: grid; gap: 0.55rem; }
+.bar { display: grid; grid-template-columns: 8rem 1fr 3rem; gap: 0.75rem; align-items: center; }
+.bar__track { background: #e2e7e1; height: 0.85rem; border-radius: 2px; overflow: hidden; }
+.bar__fill { height: 100%; background: var(--civic); }
+.bar__fill[data-key="high"] { background: var(--signal); }
+.bar__fill[data-key="resolved"] { background: var(--moss); }
+.bar__fill[data-key="in_progress"] { background: var(--amber); }
+.bar__count { text-align: right; font-variant-numeric: tabular-nums; }
+
+.figure { display: flex; gap: 2.5rem; flex-wrap: wrap; }
+.figure__number { font-size: 2.6rem; font-weight: 650; letter-spacing: -0.03em; line-height: 1; }
+
+.cache-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.cache-badge b { font-weight: 600; color: var(--ink); }
+
+/* --- loading -------------------------------------------------------------- */
+
+.working { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-soft); }
+
+.working__dot {
+  width: 0.55rem; height: 0.55rem; border-radius: 50%;
+  background: var(--civic);
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .working__dot { animation: none; opacity: 0.7; }
+}
+
+.skip-link { position: absolute; left: -999px; }
+.skip-link:focus { left: 1rem; top: 0.5rem; background: var(--card); padding: 0.5rem; z-index: 10; }
+
+@media (max-width: 640px) {
+  .page { padding: 1.5rem 1rem 3rem; }
+  .bar { grid-template-columns: 6.5rem 1fr 2.5rem; }
+}

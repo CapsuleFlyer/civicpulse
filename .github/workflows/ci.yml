@@ -1,0 +1,229 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [dev]
+
+# Least privilege. The default token is broader than any job here needs, and a
+# PR from a fork should never be able to write anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  lint-and-type:
+    name: lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r backend/requirements-dev.txt
+      - name: ruff
+        run: ruff check backend
+      - name: mypy
+        run: mypy backend/app
+        working-directory: .
+        env:
+          MYPYPATH: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: eslint
+        run: npm run lint
+        working-directory: frontend
+      - name: tsc --noEmit
+        run: npm run typecheck
+        working-directory: frontend
+
+  test-backend:
+    name: backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r backend/requirements-dev.txt
+      - name: pytest
+        working-directory: backend
+        env:
+          # Pinned to the deterministic fake. The suite must be green on every
+          # run: a flaky pipeline trains a team to ignore red.
+          TRIAGE_PROVIDER: simulated
+          SIMULATED_SEED: "1337"
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 7
+
+  test-frontend:
+    name: frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+
+  build:
+    name: build images
+    runs-on: ubuntu-latest
+    needs: [lint-and-type]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: build backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          # A pull request must not publish artifacts. It builds to prove the
+          # Dockerfile still works, and stops there.
+          push: false
+          load: true
+          tags: civicpulse/backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: build frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: civicpulse/frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: report image sizes
+        run: |
+          docker image ls civicpulse/backend:ci civicpulse/frontend:ci
+          docker save civicpulse/frontend:ci | tar -tv | head -5
+      - name: save images for the scan job
+        run: docker save -o /tmp/images.tar civicpulse/backend:ci civicpulse/frontend:ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-images
+          path: /tmp/images.tar
+          retention-days: 1
+
+  scan:
+    name: trivy image scan
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-images
+          path: /tmp
+      - run: docker load -i /tmp/images.tar
+      - name: scan backend
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: civicpulse/backend:ci
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          # Only fail on something we can actually act on: a vulnerability with
+          # no fixed version available is a tracking item, not a merge blocker.
+          ignore-unfixed: true
+      - name: scan frontend
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: civicpulse/frontend:ci
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+  manifests:
+    name: kubeconform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install kustomize and kubeconform
+        run: |
+          curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz | tar xz
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kustomize kubeconform /usr/local/bin/
+      - name: validate both overlays
+        run: |
+          for overlay in dev prod; do
+            echo "::group::$overlay"
+            kustomize build "k8s/overlays/$overlay" | kubeconform \
+              -strict -summary -ignore-missing-schemas \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            echo "::endgroup::"
+          done
+      - name: submission lint
+        run: python scripts/check_submission.py
+
+  integration:
+    name: compose integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bring the stack up
+        env:
+          POSTGRES_USER: civic
+          POSTGRES_PASSWORD: ci-only-not-a-real-secret
+          POSTGRES_DB: civicpulse
+          TRIAGE_PROVIDER: simulated
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - name: wait for readiness
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/ready; then echo; exit 0; fi
+            sleep 2
+          done
+          echo "backend never became ready"; docker compose logs --no-color | tail -100; exit 1
+      - name: a real request path, end to end
+        run: python scripts/integration_smoke.py --base-url http://localhost:8000
+      - name: the frontend is served and proxies /api
+        run: |
+          curl -fsS http://localhost:8080/ | grep -q "<div id=\"root\">"
+          curl -fsS http://localhost:8080/config.js | grep -q "apiBaseUrl"
+          curl -fsS http://localhost:8080/api/stats -o /dev/null
+      - name: the frontend cannot reach the database
+        run: |
+          # A failing command as evidence of correct design. `internal: true`
+          # means the edge network has no route to the data plane.
+          if docker compose exec -T frontend getent hosts database; then
+            echo "SEGMENTATION BROKEN: frontend resolved the database"; exit 1
+          fi
+          echo "confirmed: the frontend cannot resolve or reach the database"
+      - name: the API contract the frontend depends on still exists
+        run: python scripts/check_api_contract.py --base-url http://localhost:8000
+      - name: dump logs on failure
+        if: failure()
+        run: docker compose logs --no-color | tail -200
+      - name: tear down
+        if: always()
+        run: docker compose down -v

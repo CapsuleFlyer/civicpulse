@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: civicpulse
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "16k"
+spec:
+  rules:
+    - host: civicpulse.localhost
+      http:
+        paths:
+          # Longest prefix first: /api must win over / or every API call would
+          # be answered with the single-page app's index.html.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port: { number: 8000 }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port: { number: 80 }

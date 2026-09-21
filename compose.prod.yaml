@@ -1,0 +1,105 @@
+# Production-shaped stack: pre-built images by tag, no build context, no source
+# mount, no published database or cache port.
+#
+#   IMAGE_TAG=<commit-sha> docker compose -f compose.prod.yaml up -d
+#
+# There is no `build:` key anywhere in this file, deliberately. The artefact
+# that runs here is the one CI built, scanned and pushed — not one this host
+# compiled from whatever happens to be checked out.
+
+name: civicpulse
+
+services:
+  frontend:
+    image: ${REGISTRY:-ghcr.io/your-org}/civicpulse-frontend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
+    environment:
+      BACKEND_ORIGIN: http://backend:8000
+      API_BASE_URL: /api
+      APP_ENVIRONMENT: production
+      APP_VERSION: ${IMAGE_TAG}
+    ports:
+      - "80:8080"
+    networks: [edge]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 128M }
+
+  backend:
+    image: ${REGISTRY:-ghcr.io/your-org}/civicpulse-backend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+      REDIS_URL: redis://cache:6379/0
+      TRIAGE_PROVIDER: ${TRIAGE_PROVIDER:-llm}
+      LLM_API_KEY: ${LLM_API_KEY:?LLM_API_KEY must be supplied by the environment}
+      ENVIRONMENT: production
+      GIT_SHA: ${IMAGE_TAG}
+      RUN_MIGRATIONS: "1"
+      RUN_SEED: "0"
+    # No ports: the frontend proxies /api internally; nothing else needs it.
+    networks: [edge, internal]
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits: { cpus: "1.00", memory: 512M }
+        reservations: { cpus: "0.10", memory: 128M }
+
+  database:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  cache:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  pgdata:
+  redisdata:

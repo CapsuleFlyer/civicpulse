@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+spec:
+  # Voluntary disruptions — a node drain during a cluster upgrade — must never
+  # take the last backend pod. This does not protect against node failure;
+  # nothing does except more replicas.
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: backend }
