@@ -1,0 +1,16 @@
+# Production sizing. The requests below started as a guess and were replaced
+# with the VPA's Target recommendation after a load test — the loop is written
+# up in docs/ENGINEERING-NOTES.md, question 5.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: backend
+          resources:
+            requests: { cpu: 150m, memory: 224Mi }
+            limits: { cpu: "1", memory: 512Mi }
