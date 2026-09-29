@@ -14,7 +14,11 @@ WORKDIR /build
 COPY requirements.txt .
 RUN python -m venv /opt/venv \
  && /opt/venv/bin/pip install --upgrade pip \
- && /opt/venv/bin/pip install -r requirements.txt
+ && /opt/venv/bin/pip install -r requirements.txt \
+ # pip vendors its own copies of msgpack and setuptools, and scanners report
+ # them as if the app used them. The runtime never installs anything, so the
+ # installer is removed from the venv instead of being shipped and patched.
+ && /opt/venv/bin/pip uninstall -y pip
 
 # ---------------------------------------------------------------------------
 # Runtime
@@ -28,6 +32,8 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
+ # Same reasoning for the base image's own pip: nothing installs at runtime.
+ && python -m pip uninstall -y pip \
  && groupadd --system --gid 10001 civic \
  && useradd --system --uid 10001 --gid civic --no-create-home civic
 

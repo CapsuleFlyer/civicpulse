@@ -1,7 +1,14 @@
 # Runtime dependencies, pinned. An unpinned dependency is an unreproducible
 # build: pip would happily resolve a different tree on the CI runner than the
 # one that passed on your laptop.
-fastapi==0.115.6
+#
+# starlette is pinned explicitly, on top of what fastapi requires, because the
+# security fixes land in starlette releases and we want that version to be a
+# reviewed line in this file rather than whatever fastapi happens to resolve.
+# 1.3.1 clears CVE-2025-62727, CVE-2026-48818 and CVE-2026-54283, which the
+# 0.41.x line (the most fastapi 0.115.6 allowed) can never receive.
+fastapi==0.134.0
+starlette==1.3.1
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.0

@@ -57,7 +57,11 @@ async def list_complaints(
     )
 
 
-@router.get("/{complaint_id}", response_model=ComplaintOut)
+@router.get(
+    "/{complaint_id}",
+    response_model=ComplaintOut,
+    responses={404: {"description": "no complaint with this id"}},
+)
 async def get_complaint(complaint_id: uuid.UUID, service: ServiceDep) -> ComplaintOut:
     complaint = await service.get(complaint_id)
     if complaint is None:
@@ -65,7 +69,14 @@ async def get_complaint(complaint_id: uuid.UUID, service: ServiceDep) -> Complai
     return ComplaintOut.model_validate(complaint)
 
 
-@router.patch("/{complaint_id}/status", response_model=ComplaintOut)
+@router.patch(
+    "/{complaint_id}/status",
+    response_model=ComplaintOut,
+    responses={
+        404: {"description": "no complaint with this id"},
+        409: {"description": "illegal status transition; the body names both states"},
+    },
+)
 async def patch_status(
     complaint_id: uuid.UUID, payload: StatusPatch, service: ServiceDep
 ) -> ComplaintOut:
