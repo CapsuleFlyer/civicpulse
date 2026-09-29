@@ -140,7 +140,7 @@ jobs:
           path: /tmp
       - run: docker load -i /tmp/images.tar
       - name: scan backend
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: civicpulse/backend:ci
           format: table
@@ -150,7 +150,7 @@ jobs:
           # no fixed version available is a tracking item, not a merge blocker.
           ignore-unfixed: true
       - name: scan frontend
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: civicpulse/frontend:ci
           format: table
@@ -231,7 +231,7 @@ jobs:
           fi
           echo "confirmed: the frontend cannot resolve or reach the database"
       - name: the API contract the frontend depends on still exists
-        run: python scripts/check_api_contract.py --base-url http://localhost:8000
+        run: python scripts/check_api_contract.py --base-url http://localhost:8000 --schema-path /api/openapi.json
       - name: dump logs on failure
         if: failure()
         run: docker compose logs --no-color | tail -200
