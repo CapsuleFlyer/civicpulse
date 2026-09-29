@@ -177,9 +177,11 @@ jobs:
           # it would fail the whole deploy. (Recommender-only, so nothing is lost.)
           yq -i 'select(.kind != "Secret" and .kind != "VerticalPodAutoscaler")' /tmp/rendered.yaml
 
-          # No LLM key in this ephemeral cluster: use the deterministic provider.
+          # No LLM key in this ephemeral cluster: use the rules provider. It is
+          # keyword-based and deterministic, so the smoke test's expectation
+          # (a burst main triages as water) holds. `simulated` ignores the text.
           if [ -z "${LLM_API_KEY}" ]; then
-            yq -i '(select(.kind == "ConfigMap") | .data.TRIAGE_PROVIDER) = "simulated"' /tmp/rendered.yaml
+            yq -i '(select(.kind == "ConfigMap") | .data.TRIAGE_PROVIDER) = "rules"' /tmp/rendered.yaml
           fi
 
           kubectl apply -f /tmp/rendered.yaml
