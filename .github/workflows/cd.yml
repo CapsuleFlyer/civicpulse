@@ -187,7 +187,15 @@ jobs:
       - name: wait for the rollout
         run: |
           kubectl -n civicpulse rollout status statefulset/postgres --timeout=180s
-          kubectl -n civicpulse wait --for=condition=complete job/backend-migrate --timeout=180s
+          # Fail as soon as the Job exhausts its retries instead of sitting out a timeout.
+          for i in $(seq 1 90); do
+            ok=$(kubectl -n civicpulse get job backend-migrate -o jsonpath='{.status.succeeded}')
+            bad=$(kubectl -n civicpulse get job backend-migrate -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}')
+            [ "$ok" = "1" ] && break
+            [ "$bad" = "True" ] && { echo "migration job failed"; exit 1; }
+            sleep 2
+          done
+          [ "$ok" = "1" ] || { echo "migration job did not finish in time"; exit 1; }
           kubectl -n civicpulse rollout status deployment/backend --timeout=240s
           kubectl -n civicpulse rollout status deployment/frontend --timeout=180s
 
@@ -225,6 +233,10 @@ jobs:
         if: failure()
         run: |
           kubectl -n civicpulse get pods -o wide
+          echo "=== migration job ==="
+          kubectl -n civicpulse describe job backend-migrate | tail -30 || true
+          kubectl -n civicpulse logs -l job-name=backend-migrate --tail=100 --prefix || true
+          echo "=== pods ==="
           kubectl -n civicpulse describe pods | tail -120
           kubectl -n civicpulse logs -l app.kubernetes.io/name=backend --tail=200 || true
 

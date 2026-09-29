@@ -15,6 +15,9 @@ spec:
     - from:
         - podSelector:
             matchLabels: { app.kubernetes.io/name: backend }
+        # The one-shot migration Job needs the database too.
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: backend-migrate }
       ports:
         - protocol: TCP
           port: 5432

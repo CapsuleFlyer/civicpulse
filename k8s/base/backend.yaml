@@ -117,6 +117,11 @@ metadata:
 spec:
   backoffLimit: 3
   template:
+    metadata:
+      # Its own label, deliberately not app.kubernetes.io/name=backend: that
+      # would put a batch pod behind the backend Service and PDB selectors.
+      # The postgres NetworkPolicy allows this label explicitly.
+      labels: { app.kubernetes.io/name: backend-migrate }
     spec:
       restartPolicy: Never
       containers:
