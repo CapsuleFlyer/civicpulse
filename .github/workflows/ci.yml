@@ -117,9 +117,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: report image sizes
-        run: |
-          docker image ls civicpulse/backend:ci civicpulse/frontend:ci
-          docker save civicpulse/frontend:ci | tar -tv | head -5
+        # `docker image ls` takes at most one repository argument, so select
+        # both images with a single reference filter instead.
+        run: docker image ls --filter "reference=civicpulse/*:ci"
       - name: save images for the scan job
         run: docker save -o /tmp/images.tar civicpulse/backend:ci civicpulse/frontend:ci
       - uses: actions/upload-artifact@v4
@@ -193,7 +193,18 @@ jobs:
           POSTGRES_USER: civic
           POSTGRES_PASSWORD: ci-only-not-a-real-secret
           POSTGRES_DB: civicpulse
-          TRIAGE_PROVIDER: simulated
+          # `rules`, not `simulated`. The smoke test asserts real content (a
+          # burst main must come back as category "water"). The simulated
+          # provider picks category/priority from a seeded hash, so it is
+          # deterministic but meaningless: it is right for unit tests that
+          # exercise plumbing, and wrong for an end-to-end content assertion.
+          # The keyword engine is deterministic AND actually reads the text.
+          # Shell env beats the .env file compose reads, so this wins over
+          # whatever .env.example says.
+          TRIAGE_PROVIDER: rules
+          # The smoke script files several complaints in a few seconds; keep
+          # the limiter from getting in the way of it.
+          RATE_LIMIT_REQUESTS: "1000"
         run: |
           cp .env.example .env
           docker compose up -d --build
