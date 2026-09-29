@@ -1,6 +1,6 @@
 # CivicPulse
 
-[![CI](https://github.com/CapsuleFlyest/civicpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/CapsuleFlyest/civicpulse/actions/workflows/ci.yml)
+[![CI](https://github.com/CapsuleFlyest/civicpulse/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/CapsuleFlyest/civicpulse/actions/workflows/ci.yml)
 [![CD](https://github.com/CapsuleFlyest/civicpulse/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/CapsuleFlyest/civicpulse/actions/workflows/cd.yml)
 [![Coverage](https://img.shields.io/badge/backend%20coverage-86%25-brightgreen)](#testing)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
