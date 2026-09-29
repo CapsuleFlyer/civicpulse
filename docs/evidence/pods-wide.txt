@@ -1,0 +1,6 @@
+NAME                        READY   STATUS              RESTARTS   AGE   IP          NODE                      NOMINATED NODE   READINESS GATES
+backend-745dcf6944-t6s9k    0/1     Running             0          13s   10.42.1.4   k3d-civicpulse-server-0   <none>           <none>
+backend-migrate-2jxnn       0/1     Error               0          13s   10.42.1.5   k3d-civicpulse-server-0   <none>           <none>
+frontend-85c6458869-t6m6q   1/1     Running             0          13s   10.42.2.6   k3d-civicpulse-agent-1    <none>           <none>
+postgres-0                  0/1     ContainerCreating   0          13s   <none>      k3d-civicpulse-agent-1    <none>           <none>
+redis-6967f5d76c-gmt27      0/1     ContainerCreating   0          13s   <none>      k3d-civicpulse-agent-0    <none>           <none>

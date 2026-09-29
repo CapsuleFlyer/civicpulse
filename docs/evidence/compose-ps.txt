@@ -1,0 +1,5 @@
+NAME                    IMAGE                     COMMAND                  SERVICE    CREATED              STATUS                          PORTS
+civicpulse-backend-1    civicpulse/backend:dev    "/usr/local/bin/entr…"   backend    About a minute ago   Up About a minute (healthy)     0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+civicpulse-cache-1      redis:7.4-alpine          "docker-entrypoint.s…"   cache      About a minute ago   Up About a minute (healthy)     6379/tcp
+civicpulse-database-1   postgres:16.4-alpine      "docker-entrypoint.s…"   database   About a minute ago   Up About a minute (healthy)     5432/tcp
+civicpulse-frontend-1   civicpulse/frontend:dev   "/usr/local/bin/dock…"   frontend   About a minute ago   Restarting (1) 40 seconds ago   

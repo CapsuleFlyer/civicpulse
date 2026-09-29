@@ -1,0 +1,45 @@
+[project]
+name = "civicpulse-backend"
+version = "1.0.0"
+description = "Municipal complaint intake, triage and operations API"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/seed.py", "alembic/*"]
+
+[tool.coverage.report]
+fail_under = 65
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "C4", "ASYNC", "S", "RUF"]
+ignore = ["B008", "S101", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "E501"]
+# Seed rows are verbatim citizen text; wrapping them would change the data.
+"app/seed.py" = ["E501"]
+"app/services/triage.py" = ["S311"]  # jitter is not cryptography
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+disallow_untyped_defs = false
+exclude = ["alembic/versions", "tests"]
