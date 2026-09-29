@@ -8,7 +8,7 @@ COMPOSE ?= docker compose
 NAMESPACE ?= civicpulse
 CLUSTER ?= civicpulse
 IMAGE_TAG ?= $(shell git rev-parse HEAD 2>/dev/null || echo dev)
-REGISTRY ?= ghcr.io/CapsuleFlyer
+REGISTRY ?= ghcr.io/capsuleflyest/civicpulse
 
 .DEFAULT_GOAL := help
 .PHONY: help up down logs seed reset ps shell-backend psql redis \

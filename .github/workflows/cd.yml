@@ -6,17 +6,15 @@ on:
 
 permissions:
   contents: read
-  packages: write        # GHCR push, via GITHUB_TOKEN — scoped and revocable
-  id-token: write        # keyless signing, if you enable the Cosign bonus
+  packages: write        # GHCR push, via GITHUB_TOKEN
+  id-token: write        # keyless signing (Cosign)
 
 concurrency:
   group: cd-main
-  cancel-in-progress: false   # never cancel a deploy half-way through
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/civicpulse-backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/civicpulse-frontend
 
 jobs:
   test:
@@ -27,12 +25,16 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r backend/requirements-dev.txt
-      - run: ruff check backend && mypy app
+      - name: lint and type check
+        run: |
+          ruff check .
+          mypy app
         working-directory: backend
       - run: pytest --cov=app
         working-directory: backend
         env:
           TRIAGE_PROVIDER: simulated
+          SIMULATED_SEED: "1337"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -44,20 +46,24 @@ jobs:
   build-push:
     name: build, scan, sign and push
     runs-on: ubuntu-latest
-    # Without this the pipeline would publish artifacts built from code it
-    # already knows is broken.
     needs: [test]
     outputs:
       backend-digest: ${{ steps.backend.outputs.digest }}
       frontend-digest: ${{ steps.frontend.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: lowercase image names
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "BACKEND_IMAGE=ghcr.io/${repo}/civicpulse-backend" >> "$GITHUB_ENV"
+          echo "FRONTEND_IMAGE=ghcr.io/${repo}/civicpulse-frontend" >> "$GITHUB_ENV"
+
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          # A scoped, revocable, per-run token. Never an account password.
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build and push backend
@@ -66,7 +72,6 @@ jobs:
         with:
           context: ./backend
           push: true
-          # :latest may be pushed. It is never deployed — see the deploy job.
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
             ${{ env.BACKEND_IMAGE }}:latest
@@ -96,14 +101,12 @@ jobs:
           format: spdx-json
           artifact-name: backend-sbom.spdx.json
 
-      - name: sign both images (keyless)
+      - name: install cosign
         uses: sigstore/cosign-installer@v3
-      - run: |
+      - name: sign both images (keyless)
+        run: |
           cosign sign --yes "${BACKEND_IMAGE}@${{ steps.backend.outputs.digest }}"
           cosign sign --yes "${FRONTEND_IMAGE}@${{ steps.frontend.outputs.digest }}"
-        env:
-          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
-          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
 
       - name: record what was published
         run: |
@@ -119,6 +122,12 @@ jobs:
     needs: [build-push]
     steps:
       - uses: actions/checkout@v4
+
+      - name: lowercase image names
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "BACKEND_IMAGE=ghcr.io/${repo}/civicpulse-backend" >> "$GITHUB_ENV"
+          echo "FRONTEND_IMAGE=ghcr.io/${repo}/civicpulse-frontend" >> "$GITHUB_ENV"
 
       - name: create a k3d cluster
         run: |
@@ -145,16 +154,35 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: deploy by immutable reference
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: |
           cd k8s/overlays/prod
-          # The commit SHA, never :latest. "What is production running?" has a
-          # one-word answer you can paste into `git show`.
+          # The commit SHA, never :latest.
           kustomize edit set image \
-            ghcr.io/CapsuleFlyer/civicpulse-backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-          kustomize edit set image \
-            ghcr.io/CapsuleFlyer/civicpulse-frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          cd -
-          kustomize build k8s/overlays/prod | kubectl apply -f -
+            "${BACKEND_IMAGE}=${BACKEND_IMAGE}:${GITHUB_SHA}" \
+            "${FRONTEND_IMAGE}=${FRONTEND_IMAGE}:${GITHUB_SHA}"
+          cd - > /dev/null
+          kustomize build k8s/overlays/prod > /tmp/rendered.yaml
+
+          # Guard: fail loudly if kustomize did not inject the SHA.
+          grep -q "${BACKEND_IMAGE}:${GITHUB_SHA}" /tmp/rendered.yaml || { echo "backend SHA not injected"; exit 1; }
+          grep -q "${FRONTEND_IMAGE}:${GITHUB_SHA}" /tmp/rendered.yaml || { echo "frontend SHA not injected"; exit 1; }
+          if grep -Eq "image: .*:(dev|latest)$" /tmp/rendered.yaml; then
+            echo "an app image is still on :dev or :latest"; grep -E "image: " /tmp/rendered.yaml; exit 1
+          fi
+
+          # Never apply the placeholder Secret over the real one created above,
+          # and skip the VPA: k3d has no VerticalPodAutoscaler CRD, so applying
+          # it would fail the whole deploy. (Recommender-only, so nothing is lost.)
+          yq -i 'select(.kind != "Secret" and .kind != "VerticalPodAutoscaler")' /tmp/rendered.yaml
+
+          # No LLM key in this ephemeral cluster: use the deterministic provider.
+          if [ -z "${LLM_API_KEY}" ]; then
+            yq -i '(select(.kind == "ConfigMap") | .data.TRIAGE_PROVIDER) = "simulated"' /tmp/rendered.yaml
+          fi
+
+          kubectl apply -f /tmp/rendered.yaml
 
       - name: wait for the rollout
         run: |
@@ -163,13 +191,32 @@ jobs:
           kubectl -n civicpulse rollout status deployment/backend --timeout=240s
           kubectl -n civicpulse rollout status deployment/frontend --timeout=180s
 
+      - name: smoke test the API
+        run: |
+          # /ready, /health and /metrics are deliberately not exposed by the
+          # Ingress, so reach the backend Service directly for the full suite.
+          kubectl -n civicpulse port-forward svc/backend 18000:8000 > /tmp/pf.log 2>&1 &
+          PF_PID=$!
+          trap 'kill $PF_PID 2>/dev/null || true' EXIT
+          sleep 3
+          python3 scripts/integration_smoke.py --base-url http://localhost:18000
+
       - name: smoke test through the Ingress
         run: |
           kubectl -n civicpulse get ingress
-          python scripts/integration_smoke.py --base-url http://localhost:8081 --host civicpulse.localhost
+          for attempt in $(seq 1 60); do
+            if curl -fsS -H "Host: civicpulse.localhost" http://localhost:8081/api/stats -o /dev/null; then
+              echo "API reachable through the Ingress"; break
+            fi
+            [ "$attempt" = 60 ] && { echo "Ingress never routed /api"; exit 1; }
+            sleep 2
+          done
+          curl -fsS -H "Host: civicpulse.localhost" http://localhost:8081/ | grep -q '<div id="root">'
+          echo "frontend reachable through the Ingress"
 
-      - name: show the autoscaler
+      - name: show what is running and the autoscaler
         run: |
+          kubectl -n civicpulse get deploy -o wide
           kubectl -n civicpulse get hpa backend -o wide
           kubectl -n civicpulse describe hpa backend | tail -20
           kubectl -n civicpulse top pods || echo "metrics-server still warming up"

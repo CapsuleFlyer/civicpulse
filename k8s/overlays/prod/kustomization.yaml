@@ -8,14 +8,14 @@ resources:
 
 # Deploy by immutable reference. CI rewrites these tags with the commit SHA:
 #
-#   kustomize edit set image ghcr.io/CapsuleFlyer/civicpulse-backend=ghcr.io/CapsuleFlyer/civicpulse-backend:$GITHUB_SHA
+#   kustomize edit set image ghcr.io/capsuleflyest/civicpulse/civicpulse-backend=ghcr.io/capsuleflyest/civicpulse/civicpulse-backend:$GITHUB_SHA
 #
 # `latest` may be pushed; it is never deployed, because "what is production
 # running?" has to have an answer you can paste into `git show`.
 images:
-  - name: ghcr.io/CapsuleFlyer/civicpulse-backend
+  - name: ghcr.io/capsuleflyest/civicpulse/civicpulse-backend
     newTag: REPLACED_BY_CI
-  - name: ghcr.io/CapsuleFlyer/civicpulse-frontend
+  - name: ghcr.io/capsuleflyest/civicpulse/civicpulse-frontend
     newTag: REPLACED_BY_CI
 
 configMapGenerator:

@@ -11,7 +11,7 @@ name: civicpulse
 
 services:
   frontend:
-    image: ${REGISTRY:-ghcr.io/CapsuleFlyer}/civicpulse-frontend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
+    image: ${REGISTRY:-ghcr.io/capsuleflyest/civicpulse}/civicpulse-frontend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
     environment:
       BACKEND_ORIGIN: http://backend:8000
       API_BASE_URL: /api
@@ -34,7 +34,7 @@ services:
         limits: { cpus: "0.50", memory: 128M }
 
   backend:
-    image: ${REGISTRY:-ghcr.io/CapsuleFlyer}/civicpulse-backend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
+    image: ${REGISTRY:-ghcr.io/capsuleflyest/civicpulse}/civicpulse-backend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
       REDIS_URL: redis://cache:6379/0

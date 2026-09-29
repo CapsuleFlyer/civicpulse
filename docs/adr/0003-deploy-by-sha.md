@@ -35,7 +35,7 @@ tags: |
 The deploy job rewrites the manifests rather than templating them:
 
 ```bash
-kustomize edit set image ghcr.io/CapsuleFlyer/civicpulse-backend=...:${{ github.sha }}
+kustomize edit set image ghcr.io/capsuleflyest/civicpulse/civicpulse-backend=...:${{ github.sha }}
 ```
 
 `k8s/overlays/prod/kustomization.yaml` ships with `newTag: REPLACED_BY_CI`, which

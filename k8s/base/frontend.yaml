@@ -34,7 +34,7 @@ spec:
         runAsGroup: 10001
       containers:
         - name: frontend
-          image: ghcr.io/CapsuleFlyer/civicpulse-frontend:dev  # overlays pin this to a SHA
+          image: ghcr.io/capsuleflyest/civicpulse/civicpulse-frontend:dev  # overlays pin this to a SHA
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

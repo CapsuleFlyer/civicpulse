@@ -103,7 +103,7 @@ Two lines, because the property has to hold for both images.
 **Backend — `compose.prod.yaml:37`:**
 
 ```yaml
-image: ${REGISTRY:-ghcr.io/CapsuleFlyer}/civicpulse-backend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
+image: ${REGISTRY:-ghcr.io/capsuleflyest/civicpulse}/civicpulse-backend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
 ```
 
 and the corresponding `k8s/overlays/prod/kustomization.yaml:15–19`, which CI

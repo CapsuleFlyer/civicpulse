@@ -9,10 +9,10 @@ resources:
 # Locally built images loaded straight into the k3d/kind node, so there is no
 # registry in the loop while you are iterating.
 images:
-  - name: ghcr.io/CapsuleFlyer/civicpulse-backend
+  - name: ghcr.io/capsuleflyest/civicpulse/civicpulse-backend
     newName: civicpulse/backend
     newTag: dev
-  - name: ghcr.io/CapsuleFlyer/civicpulse-frontend
+  - name: ghcr.io/capsuleflyest/civicpulse/civicpulse-frontend
     newName: civicpulse/frontend
     newTag: dev
 

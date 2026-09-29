@@ -33,10 +33,8 @@ jobs:
       - name: ruff
         run: ruff check backend
       - name: mypy
-        run: mypy backend/app
-        working-directory: .
-        env:
-          MYPYPATH: backend
+        run: mypy app
+        working-directory: backend
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -165,6 +163,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # check_submission.py reads git history
       - name: install kustomize and kubeconform
         run: |
           curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz | tar xz

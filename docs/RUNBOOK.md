@@ -4,7 +4,7 @@ Written for the person who did not build this and is reading it at 3 a.m.
 Commands are copy-pasteable. Every section starts with the cheapest diagnostic,
 not the most likely cause.
 
-**Namespace:** `civicpulse` · **Images:** `ghcr.io/CapsuleFlyer/civicpulse-{backend,frontend}`
+**Namespace:** `civicpulse` · **Images:** `ghcr.io/capsuleflyest/civicpulse/civicpulse-{backend,frontend}`
 · **Deploy unit:** a commit SHA, never `latest`.
 
 ---
@@ -57,9 +57,9 @@ mapping, which is the answer to "what is running?".
 SHA=$(git rev-parse HEAD)            # the SHA you want, not necessarily HEAD
 cd k8s/overlays/prod
 kustomize edit set image \
-  ghcr.io/CapsuleFlyer/civicpulse-backend=ghcr.io/CapsuleFlyer/civicpulse-backend:$SHA
+  ghcr.io/capsuleflyest/civicpulse/civicpulse-backend=ghcr.io/capsuleflyest/civicpulse/civicpulse-backend:$SHA
 kustomize edit set image \
-  ghcr.io/CapsuleFlyer/civicpulse-frontend=ghcr.io/CapsuleFlyer/civicpulse-frontend:$SHA
+  ghcr.io/capsuleflyest/civicpulse/civicpulse-frontend=ghcr.io/capsuleflyest/civicpulse/civicpulse-frontend:$SHA
 cd -
 kubectl apply -k k8s/overlays/prod
 kubectl -n civicpulse rollout status deployment/backend --timeout=300s
@@ -113,7 +113,7 @@ repository agree again:
 
 ```bash
 cd k8s/overlays/prod
-kustomize edit set image ghcr.io/CapsuleFlyer/civicpulse-backend=ghcr.io/CapsuleFlyer/civicpulse-backend:$GOOD_SHA
+kustomize edit set image ghcr.io/capsuleflyest/civicpulse/civicpulse-backend=ghcr.io/capsuleflyest/civicpulse/civicpulse-backend:$GOOD_SHA
 cd - && kubectl apply -k k8s/overlays/prod
 git commit -am "revert: pin backend to $GOOD_SHA after incident" && git push
 ```

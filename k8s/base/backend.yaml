@@ -44,7 +44,7 @@ spec:
         runAsGroup: 10001
       containers:
         - name: backend
-          image: ghcr.io/CapsuleFlyer/civicpulse-backend:dev  # overlays pin this to a SHA
+          image: ghcr.io/capsuleflyest/civicpulse/civicpulse-backend:dev  # overlays pin this to a SHA
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -121,7 +121,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: ghcr.io/CapsuleFlyer/civicpulse-backend:dev
+          image: ghcr.io/capsuleflyest/civicpulse/civicpulse-backend:dev
           command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
           envFrom:
             - configMapRef: { name: backend-config }
