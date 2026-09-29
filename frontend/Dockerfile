@@ -24,7 +24,12 @@ RUN npx tsc --noEmit && npm run build -- --mode production
 # ---------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
 
-RUN apk add --no-cache gettext curl \
+# `apk upgrade` first: the nginx base image is rebuilt on its own schedule, so
+# its OS libraries (openssl, libexpat, libxml2, libpng, musl, zlib, ...) lag the
+# Alpine 3.21 security fixes. Upgrading here pulls the patched packages in at
+# build time, so a scan reflects what we ship rather than what the base shipped.
+RUN apk upgrade --no-cache \
+ && apk add --no-cache gettext curl \
  && addgroup -g 10001 -S civic \
  && adduser -u 10001 -S civic -G civic
 
